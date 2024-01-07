@@ -50,6 +50,10 @@
                          ->orderBy('reviews_avg_rating', 'desc');
         }
 
+        public function scopeMinReviews(Builder $query, $minReviews = 0) {
+            return $query->withCount('reviews')->having('reviews_count', '>=', $minReviews);
+        }
+
         private function rangeDateFilter(Builder $query, $from, $to) {
             if ($from && !$to) {
                 $query->where('created_at', '>=', $from);
