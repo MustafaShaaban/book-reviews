@@ -1,76 +1,106 @@
 <?php
 
-namespace App\Http\Controllers;
+    namespace App\Http\Controllers;
 
-use App\Models\Book;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Request;
+    use App\Models\Book;
+    use Illuminate\Database\Eloquent\Builder;
+    use Illuminate\Database\Query\Builder as QueryBuilder;
+    use Illuminate\Http\Request;
 
-class BookController extends Controller
-{
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(Request $request)
+    class BookController extends Controller
     {
-        $title = $request->input('title');
+        /**
+         * Display a listing of the resource.
+         */
+        public function index(Request $request)
+        {
+            $title  = $request->input('title');
+            $filter = $request->input('filter', '');
 
-        return view('books.index', [
-            'books' => Book::when($title, function (Builder $q, $v) {
-                $q->title($v);
-            })->paginate(5)
-        ]);
+            $books = Book::when($title, fn(Builder $q, $v) => $q->title($v));
+
+
+            $books = match ($filter) {
+                'popular_last_month' => $books->popularLastMonth(),
+                'popular_last_6months' => $books->popularLast6Months(),
+                'highest_rated_last_month' => $books->highestRatedLastMonth(),
+                'highest_rated_last_6months' => $books->highestRatedLast6Months(),
+                default => $books->latest()
+                                 ->withReviewsCount()
+                                 ->withAvgRating()
+
+            };
+
+            //            $books = $books->get();
+            $cacheKey = 'books:' . $filter . ':' . $title;
+
+            //            $books = cache()->remember($cacheKey, 3600, function() use ($books) {
+            //                return $books->get();
+            //            });
+
+
+            return view('books.index', [
+                //                'books' => $books
+                'books' => $books->get()
+            ]);
+        }
+
+        /**
+         * Show the form for creating a new resource.
+         */
+        public function create()
+        {
+            return view('books.create');
+        }
+
+        /**
+         * Store a newly created resource in storage.
+         */
+        public function store(Request $request)
+        {
+
+        }
+
+        /**
+         * Display the specified resource.
+         */
+        public function show(int $id)
+        {
+            $cacheKey = 'book:' . $id;
+
+            $book = cache()->remember($cacheKey, 3600, fn() => Book::with([ 'reviews' => fn($query) => $query->latest() ])
+                                                                   ->withAvgRating()
+                                                                   ->withReviewsCount()
+                                                                   ->findOrFail($id));
+
+            return view('books.show', [
+                'book' => $book
+            ]);
+        }
+
+        /**
+         * Show the form for editing the specified resource.
+         */
+        public function edit(string $id)
+        {
+            return view('books.edit', [
+                'book' => Book::findOrFail($id)
+            ]);
+        }
+
+        /**
+         * Update the specified resource in storage.
+         */
+        public function update(Request $request, string $id)
+        {
+            //
+        }
+
+        /**
+         * Remove the specified resource from storage.
+         */
+        public function destroy(string $id)
+        {
+            //
+        }
     }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        return view('books.create');
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        return view('books.show', [
-            'book' => Book::findOrFail($id)
-        ]);
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        return view('books.edit', [
-            'book' => Book::findOrFail($id)
-        ]);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
-    }
-}
